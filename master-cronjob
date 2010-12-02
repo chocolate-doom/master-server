@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+#
+# Copyright(C) 2010 Simon Howard
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+# 02111-1307, USA.
+#
+#
+# Cronjob script that checks the master server is running.
+#
+
+import socket
+import sys
+import struct
+from select import select
+from time import time
+
+NET_MASTER_PACKET_TYPE_ADD = 0
+NET_MASTER_PACKET_TYPE_ADD_RESPONSE = 1
+NET_MASTER_PACKET_TYPE_QUERY = 2
+NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
+
+QUERY_ATTEMPTS = 5
+
+MASTER_SERVER = "master.chocolate-doom.org"
+UDP_PORT = 2342
+
+def send_message(sock, addr, message_type, payload=None):
+    header = struct.pack(">h", message_type)
+    packet = header
+
+    if payload is not None:
+        packet += payload
+
+    sock.sendto(packet, addr)
+
+def get_response(sock, addr, expected_type, timeout):
+    """ Wait for a response packet to be received. """
+
+    start_time = time()
+
+    while time() - start_time < timeout:
+        r, w, x = select([sock], [], [], 1)
+
+        if sock in r:
+            packet, remote_addr = sock.recvfrom(1024)
+
+            type, = struct.unpack(">h", packet[0:2])
+
+            if expected_type == type:
+                return type, packet[2:]
+
+    raise Exception("No response received from server in %i seconds"
+                    % (time() - start_time))
+
+def read_string(packet):
+    terminator = struct.pack("b", 0)
+    strlen = packet.index(terminator)
+
+    result = struct.unpack("%ss" % strlen, packet[0:strlen])
+
+    return packet[strlen + 1:], result
+
+def parse_query_response(packet):
+    servers = []
+
+    while len(packet) > 0:
+        packet, addr_str = read_string(packet)
+
+        servers.append(addr_str)
+
+    return servers
+
+def query_master(addr_str):
+    """ Query a master server for its list of server IP addresses. """
+
+    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    send_message(sock, addr, NET_MASTER_PACKET_TYPE_QUERY)
+
+    type, response = get_response(sock, addr,
+                                  NET_MASTER_PACKET_TYPE_QUERY_RESPONSE,
+                                  5)
+
+    servers = parse_query_response(response)
+
+# Try several times, as there might be packet loss.
+
+failures = 0
+
+while failures < QUERY_ATTEMPTS:
+    try:
+        query_master(MASTER_SERVER)
+        break
+    except:
+        failures += 1
+else:
+    sys.stderr.write("No response from master server after %i attempts.\n"
+                     % failures)
+

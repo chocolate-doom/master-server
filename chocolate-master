@@ -1,0 +1,201 @@
+#!/usr/bin/env python
+#
+# Copyright(C) 2010 Simon Howard
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+# 02111-1307, USA.
+#
+#
+# Chocolate Doom master server.
+#
+
+import socket
+import struct
+from select import select
+from time import time, strftime
+
+# Filename of log file.
+
+LOG_FILE = "chocolate-master.log"
+
+# Servers must refresh themselves periodically.  If nothing happens
+# after this many seconds, remove them from the list.
+
+SERVER_TIMEOUT = 2 * 60 * 60  # 2 hours
+
+# Maximum length of a query response.
+
+MAX_RESPONSE_LEN = 1000
+
+# Packet types, matches the constants in net_defs.h.
+
+NET_MASTER_PACKET_TYPE_ADD = 0
+NET_MASTER_PACKET_TYPE_ADD_RESPONSE = 1
+NET_MASTER_PACKET_TYPE_QUERY = 2
+NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
+
+# Address and port to listen on.
+
+UDP_ADDRESS = socket.inet_ntoa(struct.pack(">l", socket.INADDR_ANY))
+UDP_PORT = 2342
+
+class Server:
+    """ A server that has registered itself. """
+
+    def __init__(self, addr):
+        self.addr = addr
+        self.refresh()
+
+    def refresh(self):
+        self.add_time = time()
+
+    def timed_out(self):
+        return time() - self.add_time > SERVER_TIMEOUT
+
+    def encode_addr(self):
+        s = "%s:%i" % self.addr
+
+        # Encode string along with terminating NUL.
+
+        return struct.pack("%is" % (len(s) + 1), s)
+
+class MasterServer:
+    def open_log_file(self):
+        self.log_file = open(LOG_FILE, "a")
+
+    def log_output(self, addr, s):
+        timestamp = strftime("%b %d %H:%M:%S")
+        self.log_file.write("%s %s:%i: %s\n" % ((timestamp,) + addr + (s,)))
+        self.log_file.flush()
+
+    def __init__(self, address, port):
+        """ Initialise a new master server. """
+
+        self.servers = {}
+
+        self.open_log_file()
+
+        self.server_addr = (address, port)
+        self.open_socket()
+
+    def send_message(self, addr, message_type, payload):
+        """ Send a message of the specified type to the specified
+            remote address. """
+
+        header = struct.pack(">h", message_type)
+        packet = header + payload
+
+        self.sock.sendto(packet, addr)
+
+    def response_packets(self):
+        """ Convert the list of servers into a list of payload strings
+            for responding to queries. """
+
+        packets = [struct.pack("")]
+
+        for server in self.servers.values():
+            encoded_addr = server.encode_addr()
+
+            # Start a new packet?
+
+            if len(packets[-1]) + len(encoded_addr) > MAX_RESPONSE_LEN:
+                packets.append(struct.pack(""))
+
+            packets[-1] += encoded_addr
+
+        return packets
+
+    def process_add_to_master(self, addr):
+        """ Process an "add to master" request received from a server. """
+
+        if addr in self.servers:
+            self.log_output(addr, "Refresh server")
+            server = self.servers[addr]
+            server.refresh()
+        else:
+            self.log_output(addr, "Add to master")
+            server = Server(addr)
+            self.servers[addr] = server
+
+        # Send a reply indicating successful
+
+        self.send_message(addr,
+                          NET_MASTER_PACKET_TYPE_ADD_RESPONSE,
+                          struct.pack(">h", 1))
+
+    def process_query(self, addr):
+        """ Process a query message received from a client. """
+
+        self.log_output(addr, "Query")
+        packets = self.response_packets()
+
+        for packet in packets:
+            self.send_message(addr,
+                              NET_MASTER_PACKET_TYPE_QUERY_RESPONSE,
+                              packet)
+
+    def process_packet(self, data, addr):
+        """ Process a packet received from a server. """
+
+        packet_type, = struct.unpack(">h", data[0:2])
+
+        if packet_type == NET_MASTER_PACKET_TYPE_ADD:
+            self.process_add_to_master(addr)
+        elif packet_type == NET_MASTER_PACKET_TYPE_QUERY:
+            self.process_query(addr)
+
+    def rx_packet(self):
+        """ Invoked when a packet is received. """
+
+        data, addr = self.sock.recvfrom(1024)
+
+        try:
+            self.process_packet(data, addr)
+        except Exception, e:
+            print e
+
+    def age_servers(self):
+        """ Check server timestamps and flush out stale servers. """
+
+        for server in self.servers.values():
+            if server.timed_out():
+                self.log_output(server.addr,
+                                "Timed out: no heartbeat in %i secs" %
+                                (time() - server.add_time))
+                del self.servers[server.addr]
+
+    def open_socket(self):
+        """ Open the server socket and bind to the listening address. """
+
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(self.server_addr)
+
+    def run(self):
+        """ Run the server main loop, listening for packets. """
+
+        self.log_output(self.server_addr, "Server started.")
+
+        while True:
+            r, w, x = select([self.sock], [], [], 5)
+
+            self.age_servers()
+
+            if self.sock in r:
+                self.rx_packet()
+
+if __name__ == "__main__":
+    server = MasterServer(UDP_ADDRESS, UDP_PORT)
+    server.run()
+
