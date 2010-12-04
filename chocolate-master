@@ -190,7 +190,7 @@ class MasterServer:
         # communicate with it, but other machines might not.
 
         if server.verified:
-            self.send_add_response(1)
+            self.send_add_response(server, 1)
         else:
             self.log_output(addr, "Add request, sending query to confirm")
             self.send_query(server)
