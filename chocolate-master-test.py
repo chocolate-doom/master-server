@@ -24,11 +24,14 @@
 import socket
 import sys
 import struct
+import simplejson
 
 NET_MASTER_PACKET_TYPE_ADD = 0
 NET_MASTER_PACKET_TYPE_ADD_RESPONSE = 1
 NET_MASTER_PACKET_TYPE_QUERY = 2
 NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
+NET_MASTER_PACKET_TYPE_GET_METADATA = 4
+NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE = 5
 
 UDP_PORT = 2342
 
@@ -62,7 +65,7 @@ def read_string(packet):
     terminator = struct.pack("b", 0)
     strlen = packet.index(terminator)
 
-    result = struct.unpack("%ss" % strlen, packet[0:strlen])
+    result, = struct.unpack("%ss" % strlen, packet[0:strlen])
 
     return packet[strlen + 1:], result
 
@@ -91,15 +94,17 @@ def add_to_master(addr_str):
 
     print "Address added to master."
 
-def parse_query_response(packet):
-    servers = []
+def decode_string_list(packet):
+    """ Decode binary data containing NUL-terminated strings. """
+
+    strings = []
 
     while len(packet) > 0:
-        packet, addr_str = read_string(packet)
+        packet, string = read_string(packet)
 
-        servers.append(addr_str)
+        strings.append(string)
 
-    return servers
+    return strings
 
 def query_master(addr_str):
     """ Query a master server for its list of server IP addresses. """
@@ -119,20 +124,51 @@ def query_master(addr_str):
 
     response = get_response(sock, addr, NET_MASTER_PACKET_TYPE_QUERY_RESPONSE)
 
-    servers = parse_query_response(response)
+    servers = decode_string_list(response)
 
     print "%i servers" % len(servers)
 
     for s in servers:
         print "\t%s" % s
 
+def get_metadata(addr_str):
+    """ Query a master server for metadata about its servers. """
+
+    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # Send request
+
+    print "Sending metadata query to master at %s" % str(addr)
+
+    send_message(sock, addr, NET_MASTER_PACKET_TYPE_GET_METADATA)
+
+    # Receive response
+
+    print "Waiting for response..."
+
+    response = get_response(sock, addr, NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE)
+
+    servers = decode_string_list(response)
+
+    print "%i servers" % len(servers)
+
+    for json in servers:
+        metadata = simplejson.loads(json)
+        print "\tServer: %s:%i" % (metadata["address"], metadata["port"])
+        print "\t\tName: %s" % metadata["name"]
+        print "\t\tVersion: %s" % metadata["version"]
+        print "\t\tMax. players: %i" % metadata["max_players"]
+
 if len(sys.argv) > 2 and sys.argv[1] == "query":
     query_master(sys.argv[2])
 elif len(sys.argv) > 2 and sys.argv[1] == "add":
     add_to_master(sys.argv[2])
+elif len(sys.argv) > 2 and sys.argv[1] == "get-metadata":
+    get_metadata(sys.argv[2])
 else:
     print "Usage:"
     print "chocolate-master-test.py query <address>"
     print "chocolate-master-test.py add <address>"
-
+    print "chocolate-master-test.py get-metadata <address>"
 

@@ -23,6 +23,7 @@
 
 import socket
 import struct
+import simplejson
 from select import select
 from time import time, strftime
 
@@ -50,11 +51,28 @@ NET_MASTER_PACKET_TYPE_ADD = 0
 NET_MASTER_PACKET_TYPE_ADD_RESPONSE = 1
 NET_MASTER_PACKET_TYPE_QUERY = 2
 NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
+NET_MASTER_PACKET_TYPE_GET_METADATA = 4
+NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE = 5
 
 # Address and port to listen on.
 
 UDP_ADDRESS = socket.inet_ntoa(struct.pack(">l", socket.INADDR_ANY))
 UDP_PORT = 2342
+
+def read_string(packet):
+    """ Given binary packet data, read a NUL-terminated string, returning
+        the remainder of the packet data and the decoded string. """
+
+    terminator = struct.pack("b", 0)
+
+    if terminator not in packet:
+        raise Exception("String terminator not found")
+
+    strlen = packet.index(terminator)
+
+    result, = struct.unpack("%ss" % strlen, packet[0:strlen])
+
+    return packet[strlen + 1:], result
 
 class Server:
     """ A server that has registered itself. """
@@ -62,20 +80,20 @@ class Server:
     def __init__(self, addr):
         self.addr = addr
         self.verified = False
+        self.metadata = {}
         self.refresh()
 
     def refresh(self):
         self.add_time = time()
 
+    def set_metadata(self, metadata):
+        self.metadata = metadata
+
     def timed_out(self):
         return time() - self.add_time > SERVER_TIMEOUT
 
-    def encode_addr(self):
-        s = "%s:%i" % self.addr
-
-        # Encode string along with terminating NUL.
-
-        return struct.pack("%is" % (len(s) + 1), s)
+    def __str__(self):
+        return "%s:%i" % self.addr
 
 class MasterServer:
     def open_log_file(self):
@@ -100,10 +118,30 @@ class MasterServer:
         """ Send a query to the specified server. """
 
         packet = struct.pack(">h", NET_PACKET_TYPE_QUERY)
-        
+
         self.query_sock.sendto(packet, server.addr)
 
-    def parse_query_response(self, data, addr):
+    def parse_query_data(self, data):
+        """ Read the data from a query response. """
+
+        data, version = read_string(data)
+
+        server_state, num_players, max_players, mode, mission \
+            = struct.unpack("bbbbb", data[0:5])
+
+        data, server_name = read_string(data[5:])
+
+        # Not all of this is of interest to us.  Some of it will
+        # be out of date fairly quickly because the master doesn't
+        # query the servers very often.
+
+        return {
+            "version": version,
+            "max_players": max_players,
+            "name": server_name
+        }
+
+    def process_query_response(self, data, addr):
         """ Parse a packet received (presumably) in response to a
             query that we sent to a server. """
 
@@ -121,8 +159,11 @@ class MasterServer:
         if packet_type != NET_PACKET_TYPE_QUERY_RESPONSE:
             return
 
-        # TODO: Process rest of details so that we can maintain
-        # some information about list of servers?
+        # Read metadata from query and store it for future use.
+
+        metadata = self.parse_query_data(data[2:])
+        metadata["address"], metadata["port"] = addr
+        server.set_metadata(metadata)
 
         # Server responded to our query, so it is verified.
         # We can send a positive response to its add request.
@@ -141,26 +182,24 @@ class MasterServer:
 
         self.sock.sendto(packet, addr)
 
-    def response_packets(self):
-        """ Convert the list of servers into a list of payload strings
+    def strings_to_packets(self, strings):
+        """ Convert a list of strings into a list of payload strings
             for responding to queries. """
 
         packets = [struct.pack("")]
 
-        for server in self.servers.values():
-            encoded_addr = server.encode_addr()
+        for string in strings:
 
-            # Only include verified servers.
+            # Encode string along with terminating NUL.
 
-            if not server.verified:
-                continue
+            encoded_str = struct.pack("%is" % (len(string) + 1), string)
 
             # Start a new packet?
 
-            if len(packets[-1]) + len(encoded_addr) > MAX_RESPONSE_LEN:
+            if len(packets[-1]) + len(encoded_str) > MAX_RESPONSE_LEN:
                 packets.append(struct.pack(""))
 
-            packets[-1] += encoded_addr
+            packets[-1] += encoded_str
 
         return packets
 
@@ -199,11 +238,36 @@ class MasterServer:
         """ Process a query message received from a client. """
 
         self.log_output(addr, "Query")
-        packets = self.response_packets()
 
-        for packet in packets:
+        # Generate a list of strings representing servers.  Only include
+        # verified servers.
+
+        verified_servers = filter(lambda s: s.verified, self.servers.values())
+        strings = [ str(server) for server in verified_servers]
+
+        # Send response packets.
+
+        for packet in self.strings_to_packets(strings):
             self.send_message(addr,
                               NET_MASTER_PACKET_TYPE_QUERY_RESPONSE,
+                              packet)
+
+    def process_metadata_request(self, addr):
+        """ Process a metadata request from a client. """
+
+        self.log_output(addr, "Metadata request")
+
+        # Generate a list of strings containing JSON-encoded metadata
+        # about servers.  Only include verified servers.
+
+        verified_servers = filter(lambda s: s.verified, self.servers.values())
+        strings = [ simplejson.dumps(s.metadata) for s in verified_servers]
+
+        # Send response packets.
+
+        for packet in self.strings_to_packets(strings):
+            self.send_message(addr,
+                              NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE,
                               packet)
 
     def process_packet(self, data, addr):
@@ -215,6 +279,8 @@ class MasterServer:
             self.process_add_to_master(addr)
         elif packet_type == NET_MASTER_PACKET_TYPE_QUERY:
             self.process_query(addr)
+        elif packet_type == NET_MASTER_PACKET_TYPE_GET_METADATA:
+            self.process_metadata_request(addr)
 
     def rx_packet(self):
         """ Invoked when a packet is received. """
@@ -232,7 +298,7 @@ class MasterServer:
         data, addr = self.query_sock.recvfrom(1024)
 
         try:
-            self.parse_query_response(data, addr)
+            self.process_query_response(data, addr)
         except Exception, e:
             print e
 
