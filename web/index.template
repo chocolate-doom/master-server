@@ -6,7 +6,7 @@
 </head>
 
 <body>
-<img id="cocoademon" src="cocoademon.png" alt="Cocoademon">
+<img id="cocoademon" src="cocoademon.png" title="Cocoademon">
 <h1> Chocolate Doom master server </h1>
 
 <p> Currently active servers: </p>
