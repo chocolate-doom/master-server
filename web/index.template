@@ -1,0 +1,32 @@
+<html>
+
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<title> Chocolate Doom master server </title>
+</head>
+
+<body>
+<img id="cocoademon" src="cocoademon.png" alt="Cocoademon">
+<h1> Chocolate Doom master server </h1>
+
+<p> Currently active servers: </p>
+
+<table>
+<tr>
+<th> Server address
+<th> Server name
+<th> Version
+<th> Max. players
+
+___TABLE_DATA___
+
+</table>
+
+<p>
+For more information, see
+<a href="http://www.chocolate-doom.org/">the website</a>.
+</p>
+
+</body>
+</html>
+

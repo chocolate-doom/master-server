@@ -1,0 +1,29 @@
+body {
+    background-color: black;
+    color: white;
+}
+
+table {
+    border-color: white;
+    border-width: 0 0 1px 1px;
+    border-style: solid;
+    border-collapse: collapse;
+}
+
+td, th {
+    text-align: left;
+    border-color: white;
+    border-width: 1px 1px 0 0;
+    border-style: solid;
+    margin: 0;
+    padding: 4px;
+}
+
+#cocoademon {
+    float: right;
+    width: 150px;
+    border: 0px;
+    padding-right: 20px;
+    padding-top: 20px;
+}
+
