@@ -36,6 +36,10 @@ LOG_FILE = "chocolate-master.log"
 
 SERVER_TIMEOUT = 2 * 60 * 60  # 2 hours
 
+# How long is metadata valid before we force another query to refresh it?
+
+METADATA_REFRESH_TIME = 6 * 60 * 60 # 6 hours
+
 # Maximum length of a query response.
 
 MAX_RESPONSE_LEN = 1000
@@ -87,7 +91,11 @@ class Server:
         self.add_time = time()
 
     def set_metadata(self, metadata):
+        self.metadata_time = time()
         self.metadata = metadata
+
+    def metadata_age(self):
+        return time() - self.metadata_time
 
     def timed_out(self):
         return time() - self.add_time > SERVER_TIMEOUT
@@ -220,6 +228,13 @@ class MasterServer:
         else:
             server = Server(addr)
             self.servers[addr] = server
+
+        # If the metadata for this server is old, un-verify it
+        # to force a query to refresh it.
+
+        if server.verified and server.metadata_age() > METADATA_REFRESH_TIME:
+            self.log_output(addr, "Metadata is old, forcing query")
+            server.verified = False
 
         # If the server has already been verified, we can send a
         # reply immediately.  Otherwise, query the server via a
