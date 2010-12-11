@@ -156,6 +156,7 @@ def get_metadata(addr_str):
     for json in servers:
         metadata = simplejson.loads(json)
         print "\tServer: %s:%i" % (metadata["address"], metadata["port"])
+        print "\t\tAge: %i seconds" % metadata["age"]
         print "\t\tName: %s" % metadata["name"]
         print "\t\tVersion: %s" % metadata["version"]
         print "\t\tMax. players: %i" % metadata["max_players"]

@@ -116,6 +116,19 @@ def get_server_data():
 
     return get_metadata(MASTER_SERVER)
 
+def age_string(seconds):
+    seconds = int(seconds)
+    minutes, seconds = seconds / 60, seconds % 60
+    hours, minutes = minutes / 60, minutes % 60
+    days, hours = hours / 24, hours % 24
+
+    result = "%02i:%02i:%02i" % (hours, minutes, seconds)
+
+    if days > 0:
+        result = "%i days, %s" % (days, result)
+
+    return result
+
 def generate_table_row(server):
     """ Generate a row of the HTML table, containing data for a
         particular server. """
@@ -124,7 +137,8 @@ def generate_table_row(server):
         "%s:%i" % (server["address"], server["port"]),
         escape(server["name"]),
         escape(server["version"]),
-        server["max_players"]
+        server["max_players"],
+        age_string(server["age"])
     ]
 
     result = []
@@ -136,6 +150,8 @@ def generate_table_row(server):
 
 def generate_table(server_data):
     """ Generate an HTML table from list of server metadata. """
+
+    server_data = sorted(server_data, key=lambda server: -server["age"])
 
     result = []
 

@@ -83,12 +83,16 @@ class Server:
 
     def __init__(self, addr):
         self.addr = addr
+        self.add_time = time()
         self.verified = False
         self.metadata = {}
         self.refresh()
 
     def refresh(self):
-        self.add_time = time()
+        self.refresh_time = time()
+
+    def age(self):
+        return time() - self.add_time
 
     def set_metadata(self, metadata):
         self.metadata_time = time()
@@ -98,7 +102,7 @@ class Server:
         return time() - self.metadata_time
 
     def timed_out(self):
-        return time() - self.add_time > SERVER_TIMEOUT
+        return time() - self.refresh_time > SERVER_TIMEOUT
 
     def __str__(self):
         return "%s:%i" % self.addr
@@ -272,11 +276,16 @@ class MasterServer:
 
         self.log_output(addr, "Metadata request")
 
+        def metadata_string(server):
+            metadata = server.metadata.copy()
+            metadata["age"] = server.age()
+            return simplejson.dumps(metadata)
+
         # Generate a list of strings containing JSON-encoded metadata
         # about servers.  Only include verified servers.
 
         verified_servers = filter(lambda s: s.verified, self.servers.values())
-        strings = [ simplejson.dumps(s.metadata) for s in verified_servers]
+        strings = [ metadata_string(server) for server in verified_servers]
 
         # Send response packets.
 
@@ -324,13 +333,13 @@ class MasterServer:
             if server.timed_out():
                 self.log_output(server.addr,
                                 "Timed out: no heartbeat in %i secs" %
-                                (time() - server.add_time))
+                                (time() - server.refresh_time))
                 del self.servers[server.addr]
 
             # Expect a response to queries quickly, otherwise add
             # requests are rejected.
 
-            if not server.verified and time() - server.add_time > 5:
+            if not server.verified and time() - server.refresh_time > 5:
                 self.log_output(server.addr,
                                 "No response to query, add rejected")
                 self.send_add_response(server, 0)
