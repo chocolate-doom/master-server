@@ -26,19 +26,7 @@ import struct
 import simplejson
 from select import select
 from time import time, strftime
-
-# Filename of log file.
-
-LOG_FILE = "chocolate-master.log"
-
-# Servers must refresh themselves periodically.  If nothing happens
-# after this many seconds, remove them from the list.
-
-SERVER_TIMEOUT = 2 * 60 * 60  # 2 hours
-
-# How long is metadata valid before we force another query to refresh it?
-
-METADATA_REFRESH_TIME = 6 * 60 * 60 # 6 hours
+from master_config import *
 
 # Maximum length of a query response.
 
@@ -58,10 +46,19 @@ NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
 NET_MASTER_PACKET_TYPE_GET_METADATA = 4
 NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE = 5
 
-# Address and port to listen on.
+def bind_socket_to(sock, config):
+    """ Bind the specified socket to the address/port configuration from
+        the configuration file. """
 
-UDP_ADDRESS = socket.inet_ntoa(struct.pack(">l", socket.INADDR_ANY))
-UDP_PORT = 2342
+    if config is not None:
+        if config[0] is not None:
+            address = socket.gethostbyname(config[0])
+        else:
+            address = socket.inet_ntoa(struct.pack(">l", socket.INADDR_ANY))
+
+        sock.bind((address, config[1]))
+
+# Address and port to listen on.
 
 def read_string(packet):
     """ Given binary packet data, read a NUL-terminated string, returning
@@ -113,18 +110,24 @@ class MasterServer:
 
     def log_output(self, addr, s):
         timestamp = strftime("%b %d %H:%M:%S")
-        self.log_file.write("%s %s:%i: %s\n" % ((timestamp,) + addr + (s,)))
+
+        if addr is not None:
+            addr_str = "%s:%i" % addr
+        else:
+            addr_str = "-"
+
+        self.log_file.write("%s %s %s\n" % (timestamp, addr_str, s))
         self.log_file.flush()
 
-    def __init__(self, address, port):
+    def __init__(self, server_address, query_address):
         """ Initialise a new master server. """
 
         self.servers = {}
 
         self.open_log_file()
 
-        self.server_addr = (address, port)
-        self.open_socket()
+        self.sock = self.open_socket(server_address)
+        self.query_sock = self.open_socket(query_address)
 
     def send_query(self, server):
         """ Send a query to the specified server. """
@@ -345,21 +348,18 @@ class MasterServer:
                 self.send_add_response(server, 0)
                 del self.servers[server.addr]
 
-    def open_socket(self):
-        """ Open the server socket and bind to the listening address. """
+    def open_socket(self, address):
+        """ Open a server socket and bind to the specified address. """
 
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(self.server_addr)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        bind_socket_to(sock, address)
 
-        # Query socket, used to send queries to servers to check that
-        # they are actually accessible.
-
-        self.query_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return sock
 
     def run(self):
         """ Run the server main loop, listening for packets. """
 
-        self.log_output(self.server_addr, "Server started.")
+        self.log_output(None, "Server started.")
 
         while True:
             r, w, x = select([self.sock, self.query_sock], [], [], 5)
@@ -373,6 +373,6 @@ class MasterServer:
                 self.rx_packet_query_sock()
 
 if __name__ == "__main__":
-    server = MasterServer(UDP_ADDRESS, UDP_PORT)
+    server = MasterServer(SERVER_ADDRESS, QUERY_ADDRESS)
     server.run()
 
