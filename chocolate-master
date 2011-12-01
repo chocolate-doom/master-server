@@ -342,7 +342,7 @@ class MasterServer:
             # Expect a response to queries quickly, otherwise add
             # requests are rejected.
 
-            if not server.verified and time() - server.refresh_time > 5:
+            elif not server.verified and time() - server.refresh_time > 5:
                 self.log_output(server.addr,
                                 "No response to query, add rejected")
                 self.send_add_response(server, 0)
