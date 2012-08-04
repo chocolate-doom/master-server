@@ -31,7 +31,7 @@ import secure_demo
 
 # Maximum length of a query response.
 
-MAX_RESPONSE_LEN = 1500
+MAX_RESPONSE_LEN = 1400
 
 # Normal packet types.
 

@@ -52,7 +52,7 @@ def get_response(sock, addr, message_type):
     """ Wait for a response of the specified type to be received. """
 
     while True:
-        packet, remote_addr = sock.recvfrom(1024)
+        packet, remote_addr = sock.recvfrom(1400)
 
         if remote_addr == addr:
             type, = struct.unpack(">h", packet[0:2])
