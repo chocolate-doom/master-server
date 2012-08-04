@@ -32,6 +32,10 @@ NET_MASTER_PACKET_TYPE_QUERY = 2
 NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
 NET_MASTER_PACKET_TYPE_GET_METADATA = 4
 NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE = 5
+NET_MASTER_PACKET_TYPE_SIGN_START = 6
+NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE = 7
+NET_MASTER_PACKET_TYPE_SIGN_END = 8
+NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE = 9
 
 UDP_PORT = 2342
 
@@ -147,7 +151,8 @@ def get_metadata(addr_str):
 
     print "Waiting for response..."
 
-    response = get_response(sock, addr, NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE)
+    response = get_response(sock, addr,
+                            NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE)
 
     servers = decode_string_list(response)
 
@@ -161,15 +166,65 @@ def get_metadata(addr_str):
         print "\t\tVersion: %s" % metadata["version"]
         print "\t\tMax. players: %i" % metadata["max_players"]
 
-if len(sys.argv) > 2 and sys.argv[1] == "query":
-    query_master(sys.argv[2])
-elif len(sys.argv) > 2 and sys.argv[1] == "add":
-    add_to_master(sys.argv[2])
-elif len(sys.argv) > 2 and sys.argv[1] == "get-metadata":
-    get_metadata(sys.argv[2])
+def sign_start(addr_str):
+    """ Request a signed start message from the master. """
+
+    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # Send request
+
+    print "Sending signed start request to master at %s" % str(addr_str)
+
+    send_message(sock, addr, NET_MASTER_PACKET_TYPE_SIGN_START)
+
+    # Receive response
+
+    print "Waiting for response..."
+
+    response = get_response(sock, addr,
+                            NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE)
+    print response
+
+def sign_end(addr_str):
+    """ Request a signed end message from the server. """
+
+    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    print "Paste the start message, then type ^D"
+
+    start_message = sys.stdin.read()
+    fake_sha1 = "3ijAI83u8A(*j98jf3jf"
+
+    print "Sending signed end request to master at %s" % str(addr_str)
+
+    send_message(sock, addr, NET_MASTER_PACKET_TYPE_SIGN_END,
+                 payload=(fake_sha1 + start_message))
+
+    print "Waiting for response..."
+
+    response = get_response(sock, addr,
+                            NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE)
+    print response
+
+commands = [
+    ("query",          query_master),
+    ("add",            add_to_master),
+    ("get-metadata",   get_metadata),
+    ("sign-start",     sign_start),
+    ("sign-end",       sign_end),
+]
+
+for name, callback in commands:
+    if len(sys.argv) > 2 and name == sys.argv[1]:
+        callback(sys.argv[2])
+        break
 else:
     print "Usage:"
     print "chocolate-master-test.py query <address>"
     print "chocolate-master-test.py add <address>"
     print "chocolate-master-test.py get-metadata <address>"
+    print "chocolate-master-test.py sign-start <address>"
+    print "chocolate-master-test.py sign-end <address>"
 

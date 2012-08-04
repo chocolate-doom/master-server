@@ -27,10 +27,11 @@ import simplejson
 from select import select
 from time import time, strftime
 from master_config import *
+import secure_demo
 
 # Maximum length of a query response.
 
-MAX_RESPONSE_LEN = 1000
+MAX_RESPONSE_LEN = 1500
 
 # Normal packet types.
 
@@ -45,6 +46,10 @@ NET_MASTER_PACKET_TYPE_QUERY = 2
 NET_MASTER_PACKET_TYPE_QUERY_RESPONSE = 3
 NET_MASTER_PACKET_TYPE_GET_METADATA = 4
 NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE = 5
+NET_MASTER_PACKET_TYPE_SIGN_START = 6
+NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE = 7
+NET_MASTER_PACKET_TYPE_SIGN_END = 8
+NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE = 9
 
 def bind_socket_to(sock, config):
     """ Bind the specified socket to the address/port configuration from
@@ -128,6 +133,11 @@ class MasterServer:
 
         self.sock = self.open_socket(server_address)
         self.query_sock = self.open_socket(query_address)
+
+        if secure_demo.available and SIGNING_KEY:
+            self.signer = secure_demo.SecureSigner(SIGNING_KEY)
+        else:
+            self.signer = None
 
     def send_query(self, server):
         """ Send a query to the specified server. """
@@ -297,6 +307,41 @@ class MasterServer:
                               NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE,
                               packet)
 
+    def sign_start_message(self, addr):
+        """ Generate a signed start message and return to the client. """
+
+        self.log_output(addr, "Start demo")
+
+        if self.signer is None:
+            return
+
+        # Generate start message and send it back.
+        signature = self.signer.sign_start_message()
+        self.send_message(addr, NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE,
+                          signature)
+
+    def sign_end_message(self, data, addr):
+        """ Generate a signed end message and return to the client. """
+
+        self.log_output(addr, "End demo")
+
+        if self.signer is None:
+            return
+
+        # Parse the data. The first part is a 160-bit SHA1 hash, and the
+        # rest of the data is the start message.
+        demo_hash = data[0:20]
+        start_message = data[20:]
+
+        # Parse the start message and verify the signature, then use it
+        # to generate an end message along with the hash of the demo.
+        signature = self.signer.sign_end_message(start_message, demo_hash)
+        if signature is None:
+            self.log_output(addr, "Failed to verify start message!")
+        else:
+            self.send_message(addr, NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE,
+                              signature)
+
     def process_packet(self, data, addr):
         """ Process a packet received from a server. """
 
@@ -308,6 +353,10 @@ class MasterServer:
             self.process_query(addr)
         elif packet_type == NET_MASTER_PACKET_TYPE_GET_METADATA:
             self.process_metadata_request(addr)
+        elif packet_type == NET_MASTER_PACKET_TYPE_SIGN_START:
+            self.sign_start_message(addr)
+        elif packet_type == NET_MASTER_PACKET_TYPE_SIGN_END:
+            self.sign_end_message(data[2:], addr)
 
     def rx_packet(self):
         """ Invoked when a packet is received. """

@@ -41,3 +41,8 @@ SERVER_ADDRESS = (None, 2342)
 
 QUERY_ADDRESS = None
 
+# ID of the GPG key to use to sign secure demo messages.
+# Use the email address of the key or the hex key ID.
+
+SIGNING_KEY = None
+
