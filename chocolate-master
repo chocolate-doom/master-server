@@ -316,9 +316,12 @@ class MasterServer:
             return
 
         # Generate start message and send it back.
-        signature = self.signer.sign_start_message()
+        # The nonce also gets sent in a separate field, so the client
+        # doesn't have to parse the signature to get it out.
+        nonce, signature = self.signer.sign_start_message()
+        packet = nonce + signature
         self.send_message(addr, NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE,
-                          signature)
+                          packet)
 
     def sign_end_message(self, data, addr):
         """ Generate a signed end message and return to the client. """

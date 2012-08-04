@@ -53,9 +53,8 @@ class SecureSigner(object):
         self.key = self.context.get_key(key)
         self.context.signers = [ self.key ]
 
-    def _generate_start_message(self):
+    def _generate_start_message(self, nonce):
         """Generate the plaintext used for a start message."""
-        nonce = os.urandom(NONCE_SIZE)
         return "\n".join([
             "Start-Time: %s" % now_string(),
             "Nonce: %s" % bin_to_hex(nonce),
@@ -69,8 +68,9 @@ class SecureSigner(object):
 
     def sign_start_message(self):
         """Generate a new signed start message with a random nonce value."""
-        message = self._generate_start_message()
-        return self._sign_plaintext_message(message)
+        nonce = os.urandom(NONCE_SIZE)
+        message = self._generate_start_message(nonce)
+        return (nonce, self._sign_plaintext_message(message))
 
     def _verify_signature(self, result):
         """Check the results of a verify operation."""
@@ -133,7 +133,9 @@ if __name__ == "__main__":
 
     signer = SecureSigner(sys.argv[2])
     if sys.argv[1] == "start":
-        print signer.sign_start_message()
+        nonce, start_message = signer.sign_start_message()
+        print "Nonce: %s" % bin_to_hex(nonce)
+        print start_message
     elif sys.argv[1] == "end":
         start_message = sys.stdin.read()
         fake_checksum = "3vism1idm4ibmaJ3nF1f"

@@ -184,7 +184,10 @@ def sign_start(addr_str):
 
     response = get_response(sock, addr,
                             NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE)
-    print response
+    nonce = response[0:16]
+    signature = response[16:]
+    print "Binary nonce: %s" % ("".join(map(lambda x: "%02x" % ord(x), nonce)))
+    print signature
 
 def sign_end(addr_str):
     """ Request a signed end message from the server. """
