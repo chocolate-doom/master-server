@@ -322,6 +322,8 @@ class MasterServer:
         packet = nonce + signature
         self.send_message(addr, NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE,
                           packet)
+        self.log_output(addr, "Generated nonce: %s" %
+                        secure_demo.bin_to_hex(nonce))
 
     def sign_end_message(self, data, addr):
         """ Generate a signed end message and return to the client. """
@@ -335,6 +337,9 @@ class MasterServer:
         # rest of the data is the start message.
         demo_hash = data[0:20]
         start_message = data[20:]
+
+        self.log_output(addr, "End demo hash: %s" %
+                        secure_demo.bin_to_hex(demo_hash))
 
         # Parse the start message and verify the signature, then use it
         # to generate an end message along with the hash of the demo.
@@ -364,7 +369,7 @@ class MasterServer:
     def rx_packet(self):
         """ Invoked when a packet is received. """
 
-        data, addr = self.sock.recvfrom(1024)
+        data, addr = self.sock.recvfrom(1400)
 
         try:
             self.process_packet(data, addr)
@@ -374,7 +379,7 @@ class MasterServer:
     def rx_packet_query_sock(self):
         """ Invoked when a packet is received on the query socket. """
 
-        data, addr = self.query_sock.recvfrom(1024)
+        data, addr = self.query_sock.recvfrom(1400)
 
         try:
             self.process_query_response(data, addr)

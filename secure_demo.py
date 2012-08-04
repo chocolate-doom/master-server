@@ -37,9 +37,15 @@ except ImportError:
     available = False
 
 def now_string():
-    """Generate an ISO8601 string for the current time."""
+    """Generate a string representing the current time.
+
+    The time is roughly ISO8601 UTC format, but also includes
+    milliseconds for additional accuracy.
+    """
     now = time.time()
-    return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now))
+    ms = int(now * 1000) % 1000
+    datetime_base = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(now))
+    return "%s.%03iZ" % (datetime_base, ms)
 
 def bin_to_hex(data):
     """Convert a string of binary data into a hex representation."""
@@ -56,6 +62,7 @@ class SecureSigner(object):
     def _generate_start_message(self, nonce):
         """Generate the plaintext used for a start message."""
         return "\n".join([
+            "Message-Type: Start",
             "Start-Time: %s" % now_string(),
             "Nonce: %s" % bin_to_hex(nonce),
         ])
@@ -115,15 +122,22 @@ class SecureSigner(object):
         if plaintext is None:
             return None
 
-        # We assume the plaintext message ends with a newline.
-        if plaintext[-1] != "\n":
-            plaintext = plaintext + "\n"
+        # Split plain-text of start message into lines, and verify
+        # message type:
+        plaintext = plaintext.rstrip("\n")
+        plaintext_lines = plaintext.split("\n")
 
-        # Add extra fields to the plaintext, to create the end message.
-        message = plaintext + "\n".join([
+        if plaintext_lines[0] != "Message-Type: Start":
+            return None
+
+        # Construct the end message:
+        message_lines = [ "Message-Type: Signature" ]
+        message_lines += plaintext_lines[1:]
+        message_lines += [
             "End-Time: %s" % now_string(),
             "Demo-Checksum: %s" % bin_to_hex(demo_hash),
-        ])
+        ]
+        message = "\n".join(message_lines)
         return self._sign_plaintext_message(message)
 
 if __name__ == "__main__":
