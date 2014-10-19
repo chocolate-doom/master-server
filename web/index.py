@@ -164,7 +164,7 @@ def read_template(filename):
     """ Read HTML template file. """
 
     file = open(filename)
-    result = file.read()
+    result = file.read().decode('utf8')
     file.close()
 
     return result
@@ -172,9 +172,9 @@ def read_template(filename):
 def output_html(html):
     """ Output HTML data back to client. """
 
-    print "Content-Type: text/html"
+    print "Content-Type: text/html; charset=utf-8"
     print
-    print html
+    sys.stdout.write(html.encode('utf8'))
 
 template = read_template("index.template")
 
