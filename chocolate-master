@@ -78,7 +78,7 @@ def read_string(packet):
 
     result, = struct.unpack("%ss" % strlen, packet[0:strlen])
 
-    return packet[strlen + 1:], result
+    return packet[strlen + 1:], result.decode('utf8')
 
 class Server:
     """ A server that has registered itself. """
@@ -292,7 +292,7 @@ class MasterServer:
         def metadata_string(server):
             metadata = server.metadata.copy()
             metadata["age"] = server.age()
-            return simplejson.dumps(metadata)
+            return simplejson.dumps(metadata).encode('utf8')
 
         # Generate a list of strings containing JSON-encoded metadata
         # about servers.  Only include verified servers.
