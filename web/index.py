@@ -103,7 +103,7 @@ def get_metadata(addr_str):
         r, w, x = select([sock], [], [], METADATA_GATHER_TIME)
 
         if sock in r:
-            packet, remote_addr = sock.recvfrom(1024)
+            packet, remote_addr = sock.recvfrom(4096)
 
             servers += process_metadata_response(packet)
 
