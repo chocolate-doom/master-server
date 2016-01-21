@@ -94,7 +94,7 @@ class Server:
         self.refresh_time = time()
 
     def age(self):
-        return time() - self.add_time
+        return int(time() - self.add_time)
 
     def set_metadata(self, metadata):
         self.metadata_time = time()
