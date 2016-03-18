@@ -46,3 +46,9 @@ QUERY_ADDRESS = None
 
 SIGNING_KEY = None
 
+# Blocked IP addresses which will be ignored by the master server.
+# These are Python fnmatch glob patterns.
+
+BLOCK_ADDRESSES = [
+]
+

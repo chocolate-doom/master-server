@@ -27,6 +27,7 @@ import simplejson
 from select import select
 from time import time, strftime
 from master_config import *
+from fnmatch import fnmatch
 import secure_demo
 
 # Maximum length of a query response.
@@ -124,7 +125,7 @@ class MasterServer:
         self.log_file.write("%s %s %s\n" % (timestamp, addr_str, s))
         self.log_file.flush()
 
-    def __init__(self, server_address, query_address):
+    def __init__(self, server_address, query_address, block_patterns=[]):
         """ Initialise a new master server. """
 
         self.servers = {}
@@ -133,6 +134,7 @@ class MasterServer:
 
         self.sock = self.open_socket(server_address)
         self.query_sock = self.open_socket(query_address)
+        self.block_patterns = block_patterns
 
         if secure_demo.available and SIGNING_KEY:
             self.signer = secure_demo.SecureSigner(SIGNING_KEY)
@@ -366,10 +368,17 @@ class MasterServer:
         elif packet_type == NET_MASTER_PACKET_TYPE_SIGN_END:
             self.sign_end_message(data[2:], addr)
 
+    def is_blocked(self, addr):
+        addr_str = "%s:%i" % addr
+        return any(fnmatch(addr_str, block) for block in self.block_patterns)
+
     def rx_packet(self):
         """ Invoked when a packet is received. """
 
         data, addr = self.sock.recvfrom(1400)
+
+        if self.is_blocked(addr):
+            return
 
         try:
             self.process_packet(data, addr)
@@ -430,6 +439,6 @@ class MasterServer:
                 self.rx_packet_query_sock()
 
 if __name__ == "__main__":
-    server = MasterServer(SERVER_ADDRESS, QUERY_ADDRESS)
+    server = MasterServer(SERVER_ADDRESS, QUERY_ADDRESS, BLOCK_ADDRESSES)
     server.run()
 
