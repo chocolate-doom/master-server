@@ -240,6 +240,10 @@ class MasterServer:
     def process_add_to_master(self, addr):
         """ Process an "add to master" request received from a server. """
 
+        if self.is_blocked(addr):
+            self.log_output(addr, "Ignoring add from banned server")
+            return
+
         if addr in self.servers:
             self.log_output(addr, "Refresh server")
             server = self.servers[addr]
@@ -376,9 +380,6 @@ class MasterServer:
         """ Invoked when a packet is received. """
 
         data, addr = self.sock.recvfrom(1400)
-
-        if self.is_blocked(addr):
-            return
 
         try:
             self.process_packet(data, addr)
