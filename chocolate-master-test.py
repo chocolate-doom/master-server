@@ -28,6 +28,8 @@ import sys
 import struct
 import json
 
+NET_PACKET_TYPE_NAT_HOLE_PUNCH = 16
+
 NET_MASTER_PACKET_TYPE_ADD = 0
 NET_MASTER_PACKET_TYPE_ADD_RESPONSE = 1
 NET_MASTER_PACKET_TYPE_QUERY = 2
@@ -38,6 +40,7 @@ NET_MASTER_PACKET_TYPE_SIGN_START = 6
 NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE = 7
 NET_MASTER_PACKET_TYPE_SIGN_END = 8
 NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE = 9
+NET_MASTER_PACKET_TYPE_NAT_HOLE_PUNCH = 10
 
 UDP_PORT = 2342
 
@@ -222,17 +225,39 @@ def sign_end(addr_str):
                             NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE)
     print(response)
 
+def hole_punch(master_addr_str, server_addr_str):
+    """Send a NAT hole punch request to the master server."""
+
+    master_addr = parse_address(master_addr_str)
+    server_addr = parse_address(server_addr_str)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # Send request
+    print("Sending hole punch request to master at %s" % str(master_addr))
+    packet = server_addr_str.encode("utf8") + b"\x00"
+    send_message(sock, master_addr, NET_MASTER_PACKET_TYPE_NAT_HOLE_PUNCH,
+                 packet)
+
+    # Wait for response.
+    print("Waiting for response...")
+    response = get_response(sock, server_addr,
+                            NET_PACKET_TYPE_NAT_HOLE_PUNCH)
+
+    print("Got hole punch request from server via master server.")
+
+
 commands = [
     ("query",          query_master),
     ("add",            add_to_master),
     ("get-metadata",   get_metadata),
     ("sign-start",     sign_start),
     ("sign-end",       sign_end),
+    ("hole-punch",     hole_punch),
 ]
 
 for name, callback in commands:
     if len(sys.argv) > 2 and name == sys.argv[1]:
-        callback(sys.argv[2])
+        callback(*sys.argv[2:])
         break
 else:
     print("Usage:")
@@ -241,4 +266,5 @@ else:
     print("chocolate-master-test.py get-metadata <address>")
     print("chocolate-master-test.py sign-start <address>")
     print("chocolate-master-test.py sign-end <address>")
+    print("chocolate-master-test.py hole-punch <master> <server>")
 

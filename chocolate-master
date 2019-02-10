@@ -40,6 +40,7 @@ MAX_RESPONSE_LEN = 1400
 
 NET_PACKET_TYPE_QUERY = 13
 NET_PACKET_TYPE_QUERY_RESPONSE = 14
+NET_PACKET_TYPE_NAT_HOLE_PUNCH = 16
 
 # Packet types, matches the constants in net_defs.h.
 
@@ -53,6 +54,7 @@ NET_MASTER_PACKET_TYPE_SIGN_START = 6
 NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE = 7
 NET_MASTER_PACKET_TYPE_SIGN_END = 8
 NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE = 9
+NET_MASTER_PACKET_TYPE_NAT_HOLE_PUNCH = 10
 
 def bind_socket_to(sock, config):
     """ Bind the specified socket to the address/port configuration from
@@ -356,6 +358,31 @@ class MasterServer:
             self.send_message(addr, NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE,
                               signature)
 
+    def send_hole_punch(self, server, client_addr):
+        """Send a hole punch request to a server on behalf of a client."""
+        client_addr_str = "%s:%d" % client_addr
+        packet = client_addr_str.encode("utf8") + b'\0'
+        self.send_message(server.addr, NET_MASTER_PACKET_TYPE_NAT_HOLE_PUNCH,
+                          packet)
+        self.log_output(client_addr, "Sent hole punch to %s" % server)
+
+    def process_hole_punch(self, data, addr):
+        """Process a NAT hole punch request from a client."""
+
+        # Packet just contains the address of the the server. Check it's really
+        # a server that we have registered.
+        _, server_addr_str = read_string(data)
+        self.log_output(addr, "Hole punch request for %r" % server_addr_str)
+        a, p = server_addr_str.split(":", 1)
+        server_addr = (a, int(p))
+
+        if server_addr not in self.servers:
+            self.log_output(addr, "Unknown server to hole punch")
+            return
+
+        # Forward hole punch request to the server:
+        self.send_hole_punch(self.servers[server_addr], addr)
+
     def process_packet(self, data, addr):
         """ Process a packet received from a server. """
 
@@ -371,6 +398,8 @@ class MasterServer:
             self.sign_start_message(addr)
         elif packet_type == NET_MASTER_PACKET_TYPE_SIGN_END:
             self.sign_end_message(data[2:], addr)
+        elif packet_type == NET_MASTER_PACKET_TYPE_NAT_HOLE_PUNCH:
+            self.process_hole_punch(data[2:], addr)
 
     def is_blocked(self, addr):
         addr_str = "%s:%i" % addr
