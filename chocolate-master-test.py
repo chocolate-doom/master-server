@@ -39,7 +39,16 @@ NET_MASTER_PACKET_TYPE_SIGN_START_RESPONSE = 7
 NET_MASTER_PACKET_TYPE_SIGN_END = 8
 NET_MASTER_PACKET_TYPE_SIGN_END_RESPONSE = 9
 
-UDP_PORT = 5000 # DO NOT SUBMIT
+UDP_PORT = 2342
+
+def parse_address(addr_str):
+    if ":" in addr_str:
+        addr_str, port = addr_str.split(":", 1)
+        port = int(port)
+    else:
+        port = UDP_PORT
+
+    return (socket.gethostbyname(addr_str), port)
 
 def send_message(sock, addr, message_type, payload=None):
     header = struct.pack(">h", message_type)
@@ -78,7 +87,7 @@ def read_string(packet):
 def add_to_master(addr_str):
     """ Add self to master at specified IP address. """
 
-    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    addr = parse_address(addr_str)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Send request
@@ -115,7 +124,7 @@ def decode_string_list(packet):
 def query_master(addr_str):
     """ Query a master server for its list of server IP addresses. """
 
-    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    addr = parse_address(addr_str)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Send request
@@ -140,7 +149,7 @@ def query_master(addr_str):
 def get_metadata(addr_str):
     """ Query a master server for metadata about its servers. """
 
-    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    addr = parse_address(addr_str)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Send request
@@ -171,7 +180,7 @@ def get_metadata(addr_str):
 def sign_start(addr_str):
     """ Request a signed start message from the master. """
 
-    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    addr = parse_address(addr_str)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Send request
@@ -194,7 +203,7 @@ def sign_start(addr_str):
 def sign_end(addr_str):
     """ Request a signed end message from the server. """
 
-    addr = (socket.gethostbyname(addr_str), UDP_PORT)
+    addr = parse_address(addr_str)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     print("Paste the start message, then type ^D")
