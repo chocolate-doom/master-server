@@ -23,6 +23,8 @@
 # back to the clients.
 #
 
+from __future__ import division, generators, unicode_literals, print_function
+
 from io import BytesIO
 import os
 import sys
@@ -142,16 +144,16 @@ class SecureSigner(object):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print "Usage: %s <start|end> <key>" % sys.argv[0]
+        print("Usage: %s <start|end> <key>" % sys.argv[0])
         sys.exit(1)
 
     signer = SecureSigner(sys.argv[2])
     if sys.argv[1] == "start":
         nonce, start_message = signer.sign_start_message()
-        print "Nonce: %s" % bin_to_hex(nonce)
-        print start_message
+        print("Nonce: %s" % bin_to_hex(nonce))
+        print(start_message)
     elif sys.argv[1] == "end":
         start_message = sys.stdin.read()
         fake_checksum = "3vism1idm4ibmaJ3nF1f"
-        print signer.sign_end_message(start_message, fake_checksum)
+        print(signer.sign_end_message(start_message, fake_checksum))
 

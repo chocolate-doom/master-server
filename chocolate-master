@@ -21,9 +21,11 @@
 # Chocolate Doom master server.
 #
 
+from __future__ import division, generators, unicode_literals, print_function
+
 import socket
 import struct
-import simplejson
+import json
 from select import select
 from time import time, strftime
 from master_config import *
@@ -213,18 +215,16 @@ class MasterServer:
         """ Convert a list of strings into a list of payload strings
             for responding to queries. """
 
-        packets = [struct.pack("")]
+        packets = [b""]
 
         for string in strings:
 
             # Encode string along with terminating NUL.
-
-            encoded_str = struct.pack("%is" % (len(string) + 1), string)
+            encoded_str = string.encode("utf8") + b"\x00"
 
             # Start a new packet?
-
             if len(packets[-1]) + len(encoded_str) > MAX_RESPONSE_LEN:
-                packets.append(struct.pack(""))
+                packets.append(b"")
 
             packets[-1] += encoded_str
 
@@ -298,7 +298,7 @@ class MasterServer:
         def metadata_string(server):
             metadata = server.metadata.copy()
             metadata["age"] = server.age()
-            return simplejson.dumps(metadata).encode('utf8')
+            return json.dumps(metadata).encode('utf8')
 
         # Generate a list of strings containing JSON-encoded metadata
         # about servers.  Only include verified servers.
@@ -383,8 +383,8 @@ class MasterServer:
 
         try:
             self.process_packet(data, addr)
-        except Exception, e:
-            print e
+        except Exception as e:
+            print("error on packet from %s: %s" % (addr, e))
 
     def rx_packet_query_sock(self):
         """ Invoked when a packet is received on the query socket. """
@@ -393,13 +393,13 @@ class MasterServer:
 
         try:
             self.process_query_response(data, addr)
-        except Exception, e:
-            print e
+        except Exception as e:
+            print("error on query socket packet from %s: %s" % (addr, e))
 
     def age_servers(self):
         """ Check server timestamps and flush out stale servers. """
-
-        for server in self.servers.values():
+        servers = list(self.servers.values())
+        for server in servers:
             if server.timed_out():
                 self.log_output(server.addr,
                                 "Timed out: no heartbeat in %i secs" %

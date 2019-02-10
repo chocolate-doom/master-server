@@ -35,7 +35,7 @@ METADATA_REFRESH_TIME = 6 * 60 * 60 # 6 hours
 
 # Address and port to listen on.
 
-SERVER_ADDRESS = (None, 2342)
+SERVER_ADDRESS = (None, 5000)
 
 # Address and port to bind query socket.
 
