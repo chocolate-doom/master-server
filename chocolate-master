@@ -382,7 +382,10 @@ class MasterServer:
         # a server that we have registered.
         _, server_addr_str = read_string(data)
         self.log_output(addr, "Hole punch request for %r" % server_addr_str)
-        a, p = server_addr_str.split(":", 1)
+        if ":" in server_addr_str:
+            a, p = server_addr_str.split(":", 1)
+        else:
+            a, p = server_addr_str, 2342
         server_addr = (a, int(p))
 
         if server_addr not in self.servers:
