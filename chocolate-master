@@ -267,6 +267,7 @@ class MasterServer:
         if server.verified and server.metadata_age() > METADATA_REFRESH_TIME:
             self.log_output(addr, "Metadata is old, forcing query")
             server.verified = False
+            server.needs_hole_punch = False
 
         # If the server has already been verified, we can send a
         # reply immediately.  Otherwise, query the server via a
