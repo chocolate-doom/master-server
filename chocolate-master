@@ -254,7 +254,6 @@ class MasterServer:
             return
 
         if addr in self.servers:
-            self.log_output(addr, "Refresh server")
             server = self.servers[addr]
             server.refresh()
         else:
