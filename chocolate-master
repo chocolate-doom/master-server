@@ -23,6 +23,7 @@
 
 import socket
 import struct
+import traceback
 import json
 from select import select
 from time import time, strftime
@@ -435,7 +436,8 @@ class MasterServer:
         try:
             self.process_packet(data, addr)
         except Exception as e:
-            print("error on packet from %s: %s" % (addr, e))
+            self.log_output(addr, "error processing packet: %s" % (
+                "".join(traceback.format_exception(None, e, e.__traceback__))))
 
     def rx_packet_query_sock(self):
         """ Invoked when a packet is received on the query socket. """
@@ -445,7 +447,8 @@ class MasterServer:
         try:
             self.process_query_response(data, addr)
         except Exception as e:
-            print("error on query socket packet from %s: %s" % (addr, e))
+            self.log_output(addr, "error on query socket packet: %s" % (
+                "".join(traceback.format_exception(None, e, e.__traceback__))))
 
     def check_unverified_server(self, server):
         """Check the given server that has not yet been verified."""
