@@ -21,13 +21,13 @@
 # CGI script that generates master server web page.
 #
 
-from cgi import escape
+from html import escape
 from time import time
 from select import select
 import socket
 import sys
 import struct
-import simplejson
+import json
 
 NET_MASTER_PACKET_TYPE_GET_METADATA = 4
 NET_MASTER_PACKET_TYPE_GET_METADATA_RESPONSE = 5
@@ -80,7 +80,7 @@ def process_metadata_response(packet):
 
     # Each string is a JSON-encoded dictionary.  Decode these.
 
-    return map(simplejson.loads, strings)
+    return map(json.loads, strings)
 
 def get_metadata(addr_str):
     """ Query a master server for metadata about its servers. """
@@ -163,7 +163,7 @@ def generate_table(server_data):
 def read_template(filename):
     """ Read HTML template file. """
 
-    file = open(filename)
+    file = open(filename, 'rb')
     result = file.read().decode('utf8')
     file.close()
 
@@ -172,9 +172,10 @@ def read_template(filename):
 def output_html(html):
     """ Output HTML data back to client. """
 
+    sys.stdout.reconfigure(encoding="utf-8")
     print("Content-Type: text/html; charset=utf-8")
     print()
-    sys.stdout.write(html.encode('utf8'))
+    sys.stdout.write(html)
 
 template = read_template("index.template")
 
