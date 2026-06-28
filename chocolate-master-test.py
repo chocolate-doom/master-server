@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright(C) 2010 Simon Howard
 #
@@ -20,8 +20,6 @@
 #
 # Test script for querying the master server.
 #
-
-from __future__ import division, generators, unicode_literals, print_function
 
 import socket
 import sys

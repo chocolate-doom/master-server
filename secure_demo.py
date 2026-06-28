@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright(C) 2012 Simon Howard
 #
@@ -22,8 +22,6 @@
 # uses GPG to create signed messages that are returned by the master
 # back to the clients.
 #
-
-from __future__ import division, generators, unicode_literals, print_function
 
 from io import BytesIO
 import os

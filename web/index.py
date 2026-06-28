@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright(C) 2010 Simon Howard
 #
@@ -172,8 +172,8 @@ def read_template(filename):
 def output_html(html):
     """ Output HTML data back to client. """
 
-    print "Content-Type: text/html; charset=utf-8"
-    print
+    print("Content-Type: text/html; charset=utf-8")
+    print()
     sys.stdout.write(html.encode('utf8'))
 
 template = read_template("index.template")
