@@ -304,7 +304,7 @@ class MasterServer:
         def metadata_string(server):
             metadata = server.metadata.copy()
             metadata["age"] = server.age()
-            return json.dumps(metadata).encode('utf8')
+            return json.dumps(metadata)
 
         # Generate a list of strings containing JSON-encoded metadata
         # about servers.  Only include verified servers.
